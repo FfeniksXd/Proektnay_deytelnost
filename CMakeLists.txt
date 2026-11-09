@@ -4,7 +4,7 @@ project(TicTacToe LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_PREFIX_PATH "C:/Qt/6.12.0/mingw_64")
+# set(CMAKE_PREFIX_PATH "C:/Qt/6.12.0/mingw_64")
 
 # Подключение Qt (пока только Widgets и Test)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Test)

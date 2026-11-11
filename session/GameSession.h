@@ -42,6 +42,23 @@ public:
     std::optional<Cell> winner() const;
 
 private:
-    // Тут будет внутренняя реализация (поля и приватные методы)
+    // --- ВОТ ТУТ МЫ ДОБАВИЛИ ВСЁ НЕОБХОДИМОЕ ---
+    GameRules rules_;
+    Board board_;
+    Cell currentPlayer_;
+    bool isGameOver_;
+    std::optional<Cell> winner_;
     
+    IGameObserver* observer_;
+    
+    // Умные указатели на игроков (если это ИИ, указатель не пустой)
+    std::unique_ptr<IPlayer> playerX_;
+    std::unique_ptr<IPlayer> playerO_;
+
+    // Приватные вспомогательные методы
+    void makeAIMoveIfNecessary();
+    void checkGameEnd();
+    void switchTurn();
+    void notifyBoardChanged();
+    void notifyTurnChanged();
 };

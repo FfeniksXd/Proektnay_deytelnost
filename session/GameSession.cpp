@@ -1,24 +1,22 @@
 #include "GameSession.h"
-#include "AIPlayer.h"
+#include "AIFactory.h"
 #include <stdexcept>
 
-GameSession::GameSession(SessionConfig config) 
-    : rules_(config.mode), board_(config.mode.boardSize), 
-      currentPlayer_(Cell::X), isGameOver_(false), winner_(std::nullopt), observer_(nullptr) {
-    
-    // Создаем игроков в зависимости от конфигурации
-    if (config.playerX == PlayerType::AI) {
-        playerX_ = std::make_unique<AIPlayer>();
-    } else {
-        playerX_ = nullptr; // Человек, за него ходит GUI
+namespace {
+// Человек представлен пустым указателем (за него ходит GUI), ИИ создаёт фабрика
+std::unique_ptr<IPlayer> makePlayer(PlayerType type, int difficulty) {
+    if (type == PlayerType::AI) {
+        return createAI(difficulty);
     }
-
-    if (config.playerO == PlayerType::AI) {
-        playerO_ = std::make_unique<AIPlayer>();
-    } else {
-        playerO_ = nullptr;
-    }
+    return nullptr;
 }
+} // namespace
+
+GameSession::GameSession(SessionConfig config)
+    : rules_(config.mode), board_(config.mode.boardSize),
+      currentPlayer_(Cell::X), isGameOver_(false), winner_(std::nullopt), observer_(nullptr),
+      playerX_(makePlayer(config.playerX, config.aiDifficulty)),
+      playerO_(makePlayer(config.playerO, config.aiDifficulty)) {}
 
 void GameSession::setObserver(IGameObserver* observer) {
     observer_ = observer;
@@ -26,56 +24,63 @@ void GameSession::setObserver(IGameObserver* observer) {
 
 void GameSession::start() {
     board_.reset();
+    history_.clear();
     currentPlayer_ = Cell::X;
     isGameOver_ = false;
     winner_ = std::nullopt;
-    
+
     notifyBoardChanged();
     notifyTurnChanged();
-    
+
     // Если первым ходит ИИ, он делает ход сразу
-    makeAIMoveIfNecessary();
+    playAITurns();
 }
 
-bool GameSession::makeHumanMove(Position p) {
-    // Проверяем, не закончена ли игра и не ходит ли сейчас ИИ
-    if (isGameOver_) return false;
-    if (currentPlayer_ == Cell::X && playerX_) return false; // Ход ИИ
-    if (currentPlayer_ == Cell::O && playerO_) return false; // Ход ИИ
+// ИИ текущего игрока или nullptr, если сейчас ходит человек
+IPlayer* GameSession::currentAI() const {
+    return currentPlayer_ == Cell::X ? playerX_.get() : playerO_.get();
+}
 
-    // Проверяем валидность хода через правила
-    if (!rules_.isValidMove(board_, p)) return false;
+// Единственное место, где ход ставится на доску.
+// Не знает, кто прислал ход (человек, ИИ, сеть) - ему это не важно.
+bool GameSession::applyMove(Position p) {
+    if (isGameOver_ || !rules_.isValidMove(board_, p)) return false;
 
-    // Делаем ход
     board_.set(p.row, p.col, currentPlayer_);
+    history_.push_back({p, currentPlayer_}); // пишем ДО смены очереди
     notifyBoardChanged();
+
     checkGameEnd();
-    
+    // Если игра закончилась, очередь не меняем:
+    // currentPlayer_ остаётся тем, кто сделал последний ход
     if (!isGameOver_) {
-        switchTurn();
-        makeAIMoveIfNecessary();
+        currentPlayer_ = (currentPlayer_ == Cell::X) ? Cell::O : Cell::X;
+        notifyTurnChanged();
     }
     return true;
 }
 
-void GameSession::makeAIMoveIfNecessary() {
-    if (isGameOver_) return;
+// Пока ходит ИИ, он ходит. Цикл вместо рекурсии.
+// Выходы: игра закончилась / очередь человека / ИИ не смог сделать валидный ход.
+void GameSession::playAITurns() {
+    while (!isGameOver_) {
+        IPlayer* ai = currentAI();
+        if (!ai) return; // очередь человека
 
-    IPlayer* currentAi = nullptr;
-    if (currentPlayer_ == Cell::X && playerX_) currentAi = playerX_.get();
-    if (currentPlayer_ == Cell::O && playerO_) currentAi = playerO_.get();
-
-    if (currentAi) {
-        auto move = currentAi->chooseMove(board_, rules_, currentPlayer_);
-        if (move) {
-            board_.set(move->row, move->col, currentPlayer_);
-            notifyBoardChanged();
-            checkGameEnd();
-            if (!isGameOver_) {
-                switchTurn();
-            }
-        }
+        auto move = ai->chooseMove(board_, rules_, currentPlayer_);
+        if (!move || !applyMove(*move)) return; // защита от зависания
     }
+}
+
+bool GameSession::makeHumanMove(Position p) {
+    // Игра закончена или сейчас ход ИИ
+    if (isGameOver_ || currentAI()) return false;
+
+    if (!applyMove(p)) return false;
+
+    // После хода человека даём ответить ИИ
+    playAITurns();
+    return true;
 }
 
 void GameSession::checkGameEnd() {
@@ -91,13 +96,6 @@ void GameSession::checkGameEnd() {
     }
 }
 
-void GameSession::switchTurn() {
-    currentPlayer_ = (currentPlayer_ == Cell::X) ? Cell::O : Cell::X;
-    notifyTurnChanged();
-    // После смены хода, если это ИИ, он должен сходить (рекурсивно)
-    makeAIMoveIfNecessary();
-}
-
 void GameSession::notifyBoardChanged() {
     if (observer_) observer_->onBoardChanged(board_);
 }
@@ -106,8 +104,28 @@ void GameSession::notifyTurnChanged() {
     if (observer_) observer_->onTurnChanged(currentPlayer_);
 }
 
+// Откат: убираем ходы, пока очередь не вернётся к человеку.
+// Человек vs человек: откатывается 1 ход. Человек vs ИИ: пара ходов.
 void GameSession::undo() {
-    // Пока оставим пустым, реализуем позже (нужно хранить историю ходов)
+    if (history_.empty()) return;
+    if (playerX_ && playerO_) return; // ИИ против ИИ: откат не нужен
+
+    do {
+        MoveRecord last = history_.back();
+        history_.pop_back();
+        board_.set(last.pos.row, last.pos.col, Cell::Empty);
+        currentPlayer_ = last.player; // очередь берём из записи, а не «переключаем»
+    } while (!history_.empty() && currentAI());
+
+    isGameOver_ = false;
+    winner_ = std::nullopt;
+
+    // Сначала сообщаем о результате отката...
+    notifyBoardChanged();
+    notifyTurnChanged();
+
+    // ...и только потом даём ИИ ходить (нужно, если ИИ ходил первым)
+    playAITurns();
 }
 
 void GameSession::restart() {

@@ -1,9 +1,13 @@
-add_library(session STATIC)
+add_library(session STATIC
+    AIFactory.h)
 
-# Добавляем сюда наши новые файлы
-target_sources(session PRIVATE 
+target_sources(session PRIVATE
     GameSession.cpp
-    AIPlayer.cpp
+    AIUtils.cpp
+    EasyAI.cpp
+    MediumAI.cpp
+    HardAI.cpp
+    AIFactory.cpp
 )
 
 # Сессия зависит от модуля core

@@ -65,18 +65,18 @@ private:
     // История ходов (нужна для undo)
     std::vector<MoveRecord> history_;
 
-    // Состояние ожидания ответа от игрока (ИИ, сеть, модель)
-    std::uint64_t requestId_ = 0; // номер текущего запроса хода
-    bool waiting_ = false;        // запрос отправлен, ответа ещё нет
-    bool advancing_ = false;      // сейчас работает цикл advance() (защита от рекурсии)
-    bool stalled_ = false;        // игрок не смог дать валидный ход
+    // Состояние ожидания ответа от игрока
+    std::uint64_t requestId_ = 0;  // номер текущего запроса хода
+    bool waiting_ = false;         // ждём ответ от игрока
+    bool advancing_ = false;       // сейчас работает advance() (защита от рекурсии)
+    bool stalled_ = false;         // игрок не смог дать валидный ход
 
     // Приватные вспомогательные методы
-    IPlayer* currentAI() const;   // не-человек текущего игрока, или nullptr, если ходит человек
-    bool applyMove(Position p);   // единственное место, где ход ставится на доску
-    void advance();               // пока ходит не человек, запрашивать ходы
-    void onMoveReady(std::uint64_t id, std::optional<Position> move); // ответ игрока
-    void resetPending();          // сбросить ожидание (старт, откат): старые ответы устаревают
+    IPlayer* currentAI() const;    // ИИ текущего игрока, или nullptr, если ходит человек
+    bool applyMove(Position p);    // единственное место, где ход ставится на доску
+    void advance();                // пока ходит не человек, запрашиваем ходы
+    void onMoveReady(std::uint64_t id, std::optional<Position> move);
+    void resetPending();           // сбросить ожидание (откат, перезапуск)
     void checkGameEnd();
     void notifyBoardChanged();
     void notifyTurnChanged();

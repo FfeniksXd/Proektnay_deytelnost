@@ -21,15 +21,6 @@ void GameSession::setObserver(IGameObserver* observer) {
     observer_ = observer;
 }
 
-// Позиция меняется (старт, откат): все запросы, отправленные раньше, считаются устаревшими.
-void GameSession::resetPending() {
-    ++requestId_; // ответы на старые запросы будут отброшены в onMoveReady
-    waiting_ = false;
-    stalled_ = false;
-    if (playerX_) playerX_->cancel();
-    if (playerO_) playerO_->cancel();
-}
-
 void GameSession::start() {
     resetPending();
     board_.reset();
@@ -45,7 +36,7 @@ void GameSession::start() {
     advance();
 }
 
-// Не-человек текущего игрока или nullptr, если сейчас ходит человек
+// ИИ текущего игрока или nullptr, если сейчас ходит человек
 IPlayer* GameSession::currentAI() const {
     return currentPlayer_ == Cell::X ? playerX_.get() : playerO_.get();
 }
@@ -69,11 +60,11 @@ bool GameSession::applyMove(Position p) {
     return true;
 }
 
-// Пока ходит не человек, запрашиваем у него ход.
-// Выходы: игра закончилась / ждём ответ / очередь человека / игрок не справился.
-// Флаг advancing_ не даёт цепочке мгновенных ответов превратиться в рекурсию.
+// Пока ходит не человек, запрашиваем ходы.
+// Игрок может ответить сразу (внутри requestMove) или позже; в обоих случаях
+// стек не растёт: повторный вход в advance() запрещён флагом advancing_.
 void GameSession::advance() {
-    if (advancing_) return; // повторный вход: цикл уже работает выше по стеку
+    if (advancing_) return;
     advancing_ = true;
 
     while (!isGameOver_ && !waiting_ && !stalled_) {
@@ -81,30 +72,39 @@ void GameSession::advance() {
         if (!player) break; // очередь человека
 
         waiting_ = true;
-        const std::uint64_t id = ++requestId_; // номер запроса копируется в лямбду
+        const std::uint64_t id = ++requestId_;
         player->requestMove(board_, rules_, currentPlayer_,
             [this, id](std::optional<Position> move) { onMoveReady(id, move); });
-        // Ответ пришёл сразу: waiting_ уже false, цикл идёт дальше.
-        // Ответ придёт позже: waiting_ остался true, цикл закончится.
+        // Ответил сразу: waiting_ уже false, цикл пойдёт дальше.
+        // Ответит позже: цикл закончится, onMoveReady продолжит цепочку.
     }
 
     advancing_ = false;
 }
 
-// Ответ игрока. Вызывается либо внутри requestMove (мгновенный ответ), либо позже.
 void GameSession::onMoveReady(std::uint64_t id, std::optional<Position> move) {
-    if (id != requestId_ || !waiting_) return; // устаревший или повторный ответ
-
+    // Устаревший (позиция уже изменилась) или повторный ответ
+    if (id != requestId_ || !waiting_) return;
     waiting_ = false;
+
     if (!move || !applyMove(*move)) {
-        stalled_ = true; // защита от зависания: больше не запрашиваем
+        stalled_ = true; // игрок не справился: перестаём его спрашивать
         return;
     }
-    advance(); // продолжить цепочку
+    advance();
+}
+
+// Сбросить ожидание: ответы на уже отправленные запросы станут устаревшими
+void GameSession::resetPending() {
+    ++requestId_;
+    waiting_ = false;
+    stalled_ = false;
+    if (playerX_) playerX_->cancel();
+    if (playerO_) playerO_->cancel();
 }
 
 bool GameSession::makeHumanMove(Position p) {
-    // Игра закончена или сейчас ход не человека (в том числе мы ждём ответ)
+    // Игра закончена или сейчас ход ИИ
     if (isGameOver_ || currentAI()) return false;
 
     if (!applyMove(p)) return false;
@@ -136,13 +136,13 @@ void GameSession::notifyTurnChanged() {
 }
 
 // Откат: убираем ходы, пока очередь не вернётся к человеку.
-// Человек vs человек: откатывается 1 ход. Человек vs ИИ: пара ходов
-// (а если ИИ ещё «думает», только ход человека: ответа ИИ в истории нет).
+// Человек vs человек: откатывается 1 ход. Человек vs ИИ: пара ходов.
+// Если ИИ ещё думает, откатывается только ход человека, ответ ИИ станет устаревшим.
 void GameSession::undo() {
     if (history_.empty()) return;
     if (playerX_ && playerO_) return; // ИИ против ИИ: откат не нужен
 
-    resetPending(); // ответ, который ИИ готовит сейчас, больше не нужен
+    resetPending();
 
     do {
         MoveRecord last = history_.back();

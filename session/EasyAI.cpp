@@ -3,5 +3,5 @@
 
 void EasyAI::requestMove(const Board& board, const GameRules& /*rules*/,
                          Cell /*self*/, MoveCallback onMove) {
-    onMove(randomEmptyCell(board)); // ответ готов сразу, вызываем колбэк внутри
+    onMove(randomEmptyCell(board)); // ответ приходит сразу, внутри вызова
 }

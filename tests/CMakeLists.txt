@@ -16,3 +16,7 @@ gtest_discover_tests(codec_tests)
 add_executable(async_tests test_async.cpp)
 target_link_libraries(async_tests PRIVATE session core GTest::gtest_main)
 gtest_discover_tests(async_tests)
+
+add_executable(network_host_tests test_network_host.cpp)
+target_link_libraries(network_host_tests PRIVATE session core GTest::gtest_main)
+gtest_discover_tests(network_host_tests)

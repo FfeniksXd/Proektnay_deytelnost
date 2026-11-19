@@ -10,6 +10,7 @@ target_sources(session PRIVATE
     AIFactory.cpp
     Codec.cpp
     RemotePlayer.cpp
+    NetworkHost.cpp
 )
 
 # Сессия зависит от модуля core

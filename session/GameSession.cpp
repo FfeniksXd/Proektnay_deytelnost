@@ -76,7 +76,9 @@ void GameSession::advance() {
         player->requestMove(board_, rules_, currentPlayer_,
             [this, id](std::optional<Position> move) { onMoveReady(id, move); });
         // Ответил сразу: waiting_ уже false, цикл пойдёт дальше.
-        // Ответит позже: цикл закончится, onMoveReady продолжит цепочку.
+        // Ответит позже: сообщаем GUI, что игрок думает; цикл закончится,
+        // а onMoveReady продолжит цепочку.
+        if (waiting_) setThinking(true);
     }
 
     advancing_ = false;
@@ -86,9 +88,11 @@ void GameSession::onMoveReady(std::uint64_t id, std::optional<Position> move) {
     // Устаревший (позиция уже изменилась) или повторный ответ
     if (id != requestId_ || !waiting_) return;
     waiting_ = false;
+    setThinking(false);
 
     if (!move || !applyMove(*move)) {
         stalled_ = true; // игрок не справился: перестаём его спрашивать
+        if (observer_) observer_->onPlayerStalled(currentPlayer_);
         return;
     }
     advance();
@@ -98,9 +102,18 @@ void GameSession::onMoveReady(std::uint64_t id, std::optional<Position> move) {
 void GameSession::resetPending() {
     ++requestId_;
     waiting_ = false;
+    setThinking(false);
     stalled_ = false;
     if (playerX_) playerX_->cancel();
     if (playerO_) playerO_->cancel();
+}
+
+// Сообщить GUI, что игрок начал или закончил думать (только при смене состояния)
+void GameSession::setThinking(bool thinking) {
+    if (thinking == thinkingShown_) return;
+    thinkingShown_ = thinking;
+    if (thinking) thinkingPlayer_ = currentPlayer_;
+    if (observer_) observer_->onThinkingChanged(thinkingPlayer_, thinking);
 }
 
 bool GameSession::makeHumanMove(Position p) {
@@ -138,7 +151,7 @@ void GameSession::notifyTurnChanged() {
 // Откат: убираем ходы, пока очередь не вернётся к человеку.
 // Человек vs человек: откатывается 1 ход. Человек vs ИИ: пара ходов.
 // Если ИИ ещё думает, откатывается только ход человека, ответ ИИ станет устаревшим.
-void GameSession::undo() {
+void GameSession::requestUndo() {
     if (history_.empty()) return;
     if (playerX_ && playerO_) return; // ИИ против ИИ: откат не нужен
 
@@ -162,9 +175,15 @@ void GameSession::undo() {
     advance();
 }
 
-void GameSession::restart() {
+// В локальной игре соперник-человек не присылает запросов на отмену, поэтому
+// отвечать некому. Метод нужен для общего интерфейса (в сетевой игре он работает).
+void GameSession::respondToUndo(bool /*accept*/) {}
+
+void GameSession::requestRestart() {
     start();
 }
+
+void GameSession::respondToRestart(bool /*accept*/) {}
 
 const Board& GameSession::board() const { return board_; }
 Cell GameSession::currentPlayer() const { return currentPlayer_; }

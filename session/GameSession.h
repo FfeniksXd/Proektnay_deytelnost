@@ -1,6 +1,8 @@
 #pragma once
 #include "Board.h"
 #include "GameRules.h"
+#include "IGameController.h"
+#include "IGameObserver.h"
 #include "IPlayer.h"
 #include <cstdint>
 #include <memory>
@@ -16,38 +18,31 @@ struct SessionConfig {
     int aiDifficulty = 1; // 1=легко, 2=средне, 3=сложно
 };
 
-// Интерфейс для GUI (чтобы окно знало, когда обновляться)
-class IGameObserver {
-public:
-    virtual ~IGameObserver() = default;
-    virtual void onBoardChanged(const Board& board) = 0;
-    virtual void onTurnChanged(Cell currentPlayer) = 0;
-    virtual void onGameOver(std::optional<Cell> winner) = 0;
-};
-
 // Запись об одном сделанном ходе (номер хода = позиция в списке истории)
 struct MoveRecord {
     Position pos;
     Cell player;
 };
 
-class GameSession {
+// Локальная сессия: ведёт партию, следит за очередью, вызывает игроков, уведомляет GUI
+class GameSession : public IGameController {
 public:
     explicit GameSession(SessionConfig config);
 
-    void setObserver(IGameObserver* observer);
-    void start();
+    // --- IGameController ---
+    void setObserver(IGameObserver* observer) override;
+    void start() override;
+    bool makeHumanMove(Position p) override;
 
-    // GUI вызывает этот метод, когда пользователь кликает по клетке
-    bool makeHumanMove(Position p);
+    void requestUndo() override;
+    void respondToUndo(bool accept) override;
+    void requestRestart() override;
+    void respondToRestart(bool accept) override;
 
-    void undo();
-    void restart();
-
-    const Board& board() const;
-    Cell currentPlayer() const;
-    bool isGameOver() const;
-    std::optional<Cell> winner() const;
+    const Board& board() const override;
+    Cell currentPlayer() const override;
+    bool isGameOver() const override;
+    std::optional<Cell> winner() const override;
 
 private:
     GameRules rules_;
@@ -62,7 +57,7 @@ private:
     std::unique_ptr<IPlayer> playerX_;
     std::unique_ptr<IPlayer> playerO_;
 
-    // История ходов (нужна для undo)
+    // История ходов (нужна для отката)
     std::vector<MoveRecord> history_;
 
     // Состояние ожидания ответа от игрока
@@ -70,6 +65,8 @@ private:
     bool waiting_ = false;         // ждём ответ от игрока
     bool advancing_ = false;       // сейчас работает advance() (защита от рекурсии)
     bool stalled_ = false;         // игрок не смог дать валидный ход
+    bool thinkingShown_ = false;   // GUI уже знает, что игрок думает
+    Cell thinkingPlayer_ = Cell::X;
 
     // Приватные вспомогательные методы
     IPlayer* currentAI() const;    // ИИ текущего игрока, или nullptr, если ходит человек
@@ -77,6 +74,7 @@ private:
     void advance();                // пока ходит не человек, запрашиваем ходы
     void onMoveReady(std::uint64_t id, std::optional<Position> move);
     void resetPending();           // сбросить ожидание (откат, перезапуск)
+    void setThinking(bool thinking);
     void checkGameEnd();
     void notifyBoardChanged();
     void notifyTurnChanged();

@@ -8,6 +8,7 @@ target_sources(session PRIVATE
     MediumAI.cpp
     HardAI.cpp
     AIFactory.cpp
+    Codec.cpp
 )
 
 # Сессия зависит от модуля core

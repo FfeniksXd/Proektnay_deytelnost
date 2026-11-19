@@ -102,13 +102,16 @@
 {"type":"game_over","winner":"X"}
 {"type":"game_over","winner":null}
 {"type":"hello","protocol":1,"resumeToken":"9f3c1a7e"}
-{"type":"sync","board":["X","","O","","X","","","",""],"currentPlayer":"O","moveCount":3,
+{"type":"sync","board":"X.O.X....","currentPlayer":"O","moveCount":3,
  "gameOver":false,"winner":null}
 {"type":"restart_applied","yourSymbol":"X"}
 {"type":"ping"}
 ```
 
 (Каждое сообщение на самом деле занимает одну строку, здесь одно из них перенесено для читаемости.)
+
+`board` в `sync` это строка из символов `X`, `O` и `.` (пустая клетка): клетки по строкам доски,
+слева направо, сверху вниз. Так сообщение компактнее, и доска до 60x60 помещается в лимит длины строки.
 
 Значения `reason` в `move_rejected`: `not_your_turn`, `invalid_cell`, `game_over`.
 `winner` в `game_over`: `"X"`, `"O"` или `null` (ничья). В режиме *misere* это **победитель партии**,

@@ -9,6 +9,7 @@ target_sources(session PRIVATE
     HardAI.cpp
     AIFactory.cpp
     Codec.cpp
+    RemotePlayer.cpp
 )
 
 # Сессия зависит от модуля core

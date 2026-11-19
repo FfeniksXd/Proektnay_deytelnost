@@ -23,6 +23,10 @@ class GameSession : public IGameController {
 public:
     explicit GameSession(SessionConfig config);
 
+    // Игроков можно передать готовыми (сетевой, тестовый): nullptr = ходит человек через GUI.
+    // Сессия становится владельцем переданных игроков.
+    GameSession(GameMode mode, std::unique_ptr<IPlayer> playerX, std::unique_ptr<IPlayer> playerO);
+
     // --- IGameController ---
     void setObserver(IGameObserver* observer) override;
     void start() override;

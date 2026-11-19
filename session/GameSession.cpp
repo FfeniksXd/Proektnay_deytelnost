@@ -1,5 +1,6 @@
 #include "GameSession.h"
 #include "AIFactory.h"
+#include <utility>
 
 namespace {
 // Человек представлен пустым указателем (за него ходит GUI), ИИ создаёт фабрика
@@ -12,10 +13,15 @@ std::unique_ptr<IPlayer> makePlayer(PlayerType type, int difficulty) {
 } // namespace
 
 GameSession::GameSession(SessionConfig config)
-    : rules_(config.mode), board_(config.mode.boardSize),
+    : GameSession(config.mode,
+                  makePlayer(config.playerX, config.aiDifficulty),
+                  makePlayer(config.playerO, config.aiDifficulty)) {}
+
+GameSession::GameSession(GameMode mode, std::unique_ptr<IPlayer> playerX,
+                         std::unique_ptr<IPlayer> playerO)
+    : rules_(mode), board_(mode.boardSize),
       currentPlayer_(Cell::X), isGameOver_(false), winner_(std::nullopt), observer_(nullptr),
-      playerX_(makePlayer(config.playerX, config.aiDifficulty)),
-      playerO_(makePlayer(config.playerO, config.aiDifficulty)) {}
+      playerX_(std::move(playerX)), playerO_(std::move(playerO)) {}
 
 void GameSession::setObserver(IGameObserver* observer) {
     observer_ = observer;

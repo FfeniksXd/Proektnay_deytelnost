@@ -12,3 +12,7 @@ gtest_discover_tests(session_tests)
 add_executable(codec_tests test_codec.cpp)
 target_link_libraries(codec_tests PRIVATE session core GTest::gtest_main)
 gtest_discover_tests(codec_tests)
+
+add_executable(async_tests test_async.cpp)
+target_link_libraries(async_tests PRIVATE session core GTest::gtest_main)
+gtest_discover_tests(async_tests)

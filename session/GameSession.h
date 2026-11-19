@@ -18,12 +18,6 @@ struct SessionConfig {
     int aiDifficulty = 1; // 1=легко, 2=средне, 3=сложно
 };
 
-// Запись об одном сделанном ходе (номер хода = позиция в списке истории)
-struct MoveRecord {
-    Position pos;
-    Cell player;
-};
-
 // Локальная сессия: ведёт партию, следит за очередью, вызывает игроков, уведомляет GUI
 class GameSession : public IGameController {
 public:

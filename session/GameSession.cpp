@@ -49,6 +49,7 @@ bool GameSession::applyMove(Position p) {
     board_.set(p.row, p.col, currentPlayer_);
     history_.push_back({p, currentPlayer_}); // пишем ДО смены очереди
     notifyBoardChanged();
+    if (observer_) observer_->onMoveApplied(history_.back(), static_cast<int>(history_.size()));
 
     checkGameEnd();
     // Если игра закончилась, очередь не меняем:

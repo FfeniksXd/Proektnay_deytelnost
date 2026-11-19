@@ -50,11 +50,13 @@ struct GuiRecorder : IGameObserver {
     int aborted = 0;
     std::string abortReason;
     int moves = 0;
+    std::optional<Cell> started;
     void onBoardChanged(const Board&) override {}
     void onTurnChanged(Cell) override {}
     void onGameOver(std::optional<Cell>) override {}
     void onMoveApplied(const MoveRecord&, int) override { ++moves; }
     void onGameAborted(const std::string& reason) override { ++aborted; abortReason = reason; }
+    void onGameStarted(Cell yourSymbol) override { started = yourSymbol; }
 };
 
 HostOptions hostOptions(HostSide side, const std::string& token = "T1") {
@@ -398,4 +400,16 @@ TEST(NetworkHostTest, HostGuiSeesMovesFromBothSides) {
     client.send(Move{{0, 0}});
     pump({&link});
     EXPECT_EQ(gui.moves, 2);
+}
+
+TEST(NetworkHostTest, HostWindowLearnsItsOwnSymbol) {
+    FakeLink link;
+    NetworkHost host(kClassic, hostOptions(HostSide::O));
+    GuiRecorder gui;
+    host.setObserver(&gui);
+    TestClient client(link.b());
+    connect(host, link, client);
+
+    ASSERT_TRUE(gui.started.has_value());
+    EXPECT_EQ(*gui.started, Cell::O);
 }

@@ -20,3 +20,7 @@ gtest_discover_tests(async_tests)
 add_executable(network_host_tests test_network_host.cpp)
 target_link_libraries(network_host_tests PRIVATE session core GTest::gtest_main)
 gtest_discover_tests(network_host_tests)
+
+add_executable(network_client_tests test_network_client.cpp)
+target_link_libraries(network_client_tests PRIVATE session core GTest::gtest_main)
+gtest_discover_tests(network_client_tests)

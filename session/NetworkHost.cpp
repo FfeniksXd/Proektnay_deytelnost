@@ -179,6 +179,7 @@ void NetworkHost::startGameWith(IConnection* connection) {
     welcome.resumeToken = token_;
     sendToClient(welcome);
 
+    if (gui_) gui_->onGameStarted(hostIsX ? Cell::X : Cell::O);
     session_->start(); // welcome уже отправлен: клиент получит события после него
 }
 

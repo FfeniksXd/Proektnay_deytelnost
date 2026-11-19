@@ -26,12 +26,19 @@ public:
 
     // Очередь перешла к игроку. После конца партии НЕ вызывается:
     // итог партии сообщает onGameOver.
+    // (У сетевого клиента для последнего хода партии оно может прийти непосредственно перед
+    // onGameOver: клиент узнаёт о конце партии только из отдельного сообщения хоста.
+    // Итог показывай по onGameOver.)
     virtual void onTurnChanged(Cell currentPlayer) = 0;
 
     // Партия закончилась. winner пустой = ничья.
     virtual void onGameOver(std::optional<Cell> winner) = 0;
 
     // ---- Необязательные ----
+
+    // Сетевая партия началась. yourSymbol: чем играет этот игрок (X или O) - для надписи
+    // «Вы играете за X». Приходит до первых onBoardChanged / onTurnChanged.
+    virtual void onGameStarted(Cell /*yourSymbol*/) {}
 
     // Ход принят и поставлен на доску (приходит сразу после onBoardChanged и до onGameOver).
     // moveNo: порядковый номер хода в партии, начиная с 1.

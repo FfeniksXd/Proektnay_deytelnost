@@ -11,6 +11,7 @@ target_sources(session PRIVATE
     Codec.cpp
     RemotePlayer.cpp
     NetworkHost.cpp
+    NetworkClient.cpp
 )
 
 # Сессия зависит от модуля core

@@ -2,6 +2,7 @@
 #include "Board.h"
 #include "GameRules.h"
 #include "IPlayer.h"
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -64,10 +65,18 @@ private:
     // История ходов (нужна для undo)
     std::vector<MoveRecord> history_;
 
+    // Состояние ожидания ответа от игрока (ИИ, сеть, модель)
+    std::uint64_t requestId_ = 0; // номер текущего запроса хода
+    bool waiting_ = false;        // запрос отправлен, ответа ещё нет
+    bool advancing_ = false;      // сейчас работает цикл advance() (защита от рекурсии)
+    bool stalled_ = false;        // игрок не смог дать валидный ход
+
     // Приватные вспомогательные методы
-    IPlayer* currentAI() const;   // ИИ текущего игрока, или nullptr, если ходит человек
+    IPlayer* currentAI() const;   // не-человек текущего игрока, или nullptr, если ходит человек
     bool applyMove(Position p);   // единственное место, где ход ставится на доску
-    void playAITurns();           // пока ходит ИИ, пусть ходит
+    void advance();               // пока ходит не человек, запрашивать ходы
+    void onMoveReady(std::uint64_t id, std::optional<Position> move); // ответ игрока
+    void resetPending();          // сбросить ожидание (старт, откат): старые ответы устаревают
     void checkGameEnd();
     void notifyBoardChanged();
     void notifyTurnChanged();

@@ -1,8 +1,8 @@
 #include "MediumAI.h"
 #include "AIUtils.h"
 
-std::optional<Position> MediumAI::chooseMove(
-    const Board& board, const GameRules& /*rules*/, Cell /*self*/) {
+void MediumAI::requestMove(const Board& board, const GameRules& /*rules*/,
+                           Cell /*self*/, MoveCallback onMove) {
     // TODO: победный ход / блокировка (нужен рабочий GameRules::winner)
-    return randomEmptyCell(board);
+    onMove(randomEmptyCell(board));
 }

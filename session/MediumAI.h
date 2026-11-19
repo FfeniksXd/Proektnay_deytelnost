@@ -7,6 +7,6 @@
 //       3) иначе случайный ход.
 class MediumAI : public IPlayer {
 public:
-    std::optional<Position> chooseMove(
-        const Board& board, const GameRules& rules, Cell self) override;
+    void requestMove(const Board& board, const GameRules& rules,
+                     Cell self, MoveCallback onMove) override;
 };

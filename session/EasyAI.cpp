@@ -1,7 +1,7 @@
 #include "EasyAI.h"
 #include "AIUtils.h"
 
-std::optional<Position> EasyAI::chooseMove(
-    const Board& board, const GameRules& /*rules*/, Cell /*self*/) {
-    return randomEmptyCell(board);
+void EasyAI::requestMove(const Board& board, const GameRules& /*rules*/,
+                         Cell /*self*/, MoveCallback onMove) {
+    onMove(randomEmptyCell(board)); // ответ готов сразу, вызываем колбэк внутри
 }

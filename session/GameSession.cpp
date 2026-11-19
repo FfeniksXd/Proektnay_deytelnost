@@ -1,6 +1,5 @@
 #include "GameSession.h"
 #include "AIFactory.h"
-#include <stdexcept>
 
 namespace {
 // Человек представлен пустым указателем (за него ходит GUI), ИИ создаёт фабрика
@@ -22,7 +21,17 @@ void GameSession::setObserver(IGameObserver* observer) {
     observer_ = observer;
 }
 
+// Позиция меняется (старт, откат): все запросы, отправленные раньше, считаются устаревшими.
+void GameSession::resetPending() {
+    ++requestId_; // ответы на старые запросы будут отброшены в onMoveReady
+    waiting_ = false;
+    stalled_ = false;
+    if (playerX_) playerX_->cancel();
+    if (playerO_) playerO_->cancel();
+}
+
 void GameSession::start() {
+    resetPending();
     board_.reset();
     history_.clear();
     currentPlayer_ = Cell::X;
@@ -33,10 +42,10 @@ void GameSession::start() {
     notifyTurnChanged();
 
     // Если первым ходит ИИ, он делает ход сразу
-    playAITurns();
+    advance();
 }
 
-// ИИ текущего игрока или nullptr, если сейчас ходит человек
+// Не-человек текущего игрока или nullptr, если сейчас ходит человек
 IPlayer* GameSession::currentAI() const {
     return currentPlayer_ == Cell::X ? playerX_.get() : playerO_.get();
 }
@@ -60,26 +69,48 @@ bool GameSession::applyMove(Position p) {
     return true;
 }
 
-// Пока ходит ИИ, он ходит. Цикл вместо рекурсии.
-// Выходы: игра закончилась / очередь человека / ИИ не смог сделать валидный ход.
-void GameSession::playAITurns() {
-    while (!isGameOver_) {
-        IPlayer* ai = currentAI();
-        if (!ai) return; // очередь человека
+// Пока ходит не человек, запрашиваем у него ход.
+// Выходы: игра закончилась / ждём ответ / очередь человека / игрок не справился.
+// Флаг advancing_ не даёт цепочке мгновенных ответов превратиться в рекурсию.
+void GameSession::advance() {
+    if (advancing_) return; // повторный вход: цикл уже работает выше по стеку
+    advancing_ = true;
 
-        auto move = ai->chooseMove(board_, rules_, currentPlayer_);
-        if (!move || !applyMove(*move)) return; // защита от зависания
+    while (!isGameOver_ && !waiting_ && !stalled_) {
+        IPlayer* player = currentAI();
+        if (!player) break; // очередь человека
+
+        waiting_ = true;
+        const std::uint64_t id = ++requestId_; // номер запроса копируется в лямбду
+        player->requestMove(board_, rules_, currentPlayer_,
+            [this, id](std::optional<Position> move) { onMoveReady(id, move); });
+        // Ответ пришёл сразу: waiting_ уже false, цикл идёт дальше.
+        // Ответ придёт позже: waiting_ остался true, цикл закончится.
     }
+
+    advancing_ = false;
+}
+
+// Ответ игрока. Вызывается либо внутри requestMove (мгновенный ответ), либо позже.
+void GameSession::onMoveReady(std::uint64_t id, std::optional<Position> move) {
+    if (id != requestId_ || !waiting_) return; // устаревший или повторный ответ
+
+    waiting_ = false;
+    if (!move || !applyMove(*move)) {
+        stalled_ = true; // защита от зависания: больше не запрашиваем
+        return;
+    }
+    advance(); // продолжить цепочку
 }
 
 bool GameSession::makeHumanMove(Position p) {
-    // Игра закончена или сейчас ход ИИ
+    // Игра закончена или сейчас ход не человека (в том числе мы ждём ответ)
     if (isGameOver_ || currentAI()) return false;
 
     if (!applyMove(p)) return false;
 
     // После хода человека даём ответить ИИ
-    playAITurns();
+    advance();
     return true;
 }
 
@@ -105,10 +136,13 @@ void GameSession::notifyTurnChanged() {
 }
 
 // Откат: убираем ходы, пока очередь не вернётся к человеку.
-// Человек vs человек: откатывается 1 ход. Человек vs ИИ: пара ходов.
+// Человек vs человек: откатывается 1 ход. Человек vs ИИ: пара ходов
+// (а если ИИ ещё «думает», только ход человека: ответа ИИ в истории нет).
 void GameSession::undo() {
     if (history_.empty()) return;
     if (playerX_ && playerO_) return; // ИИ против ИИ: откат не нужен
+
+    resetPending(); // ответ, который ИИ готовит сейчас, больше не нужен
 
     do {
         MoveRecord last = history_.back();
@@ -125,7 +159,7 @@ void GameSession::undo() {
     notifyTurnChanged();
 
     // ...и только потом даём ИИ ходить (нужно, если ИИ ходил первым)
-    playAITurns();
+    advance();
 }
 
 void GameSession::restart() {

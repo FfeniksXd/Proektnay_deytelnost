@@ -24,3 +24,12 @@ gtest_discover_tests(network_host_tests)
 add_executable(network_client_tests test_network_client.cpp)
 target_link_libraries(network_client_tests PRIVATE session core GTest::gtest_main)
 gtest_discover_tests(network_client_tests)
+
+add_executable(line_splitter_tests test_line_splitter.cpp)
+target_link_libraries(line_splitter_tests PRIVATE session core GTest::gtest_main)
+gtest_discover_tests(line_splitter_tests)
+
+# Тесты на настоящих сокетах: нужен свой main с QCoreApplication, поэтому GTest::gtest
+add_executable(qt_net_tests test_qt_net.cpp)
+target_link_libraries(qt_net_tests PRIVATE session_qt session core GTest::gtest)
+add_test(NAME qt_net_tests COMMAND qt_net_tests)

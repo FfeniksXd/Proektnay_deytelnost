@@ -6,8 +6,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # set(CMAKE_PREFIX_PATH "C:/Qt/6.12.0/mingw_64")
 
-# Подключение Qt (пока только Widgets и Test)
-find_package(Qt6 REQUIRED COMPONENTS Widgets Test)
+
+# Подключение Qt (Widgets и Test network)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Test Network)
 qt_standard_project_setup()
 
 # Подключение Google Test через скачивание
@@ -34,3 +35,4 @@ add_subdirectory(core)
 add_subdirectory(session)
 add_subdirectory(gui)
 add_subdirectory(tests)
+

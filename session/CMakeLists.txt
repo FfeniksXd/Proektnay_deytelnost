@@ -12,8 +12,10 @@ target_sources(session PRIVATE
     RemotePlayer.cpp
     NetworkHost.cpp
     NetworkClient.cpp
+    LineSplitter.cpp
 )
 
 # Сессия зависит от модуля core
 target_link_libraries(session PUBLIC core PRIVATE nlohmann_json::nlohmann_json)
 target_include_directories(session PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+add_subdirectory(qt)
